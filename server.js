@@ -44,6 +44,7 @@ app.post('/ai', async (req, res) => {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+          'anthropic-workspace-id': 'wrkspc_01MRJj3ftfcKngFvmVwnZNpC',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
