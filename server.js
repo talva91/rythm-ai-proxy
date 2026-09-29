@@ -46,7 +46,7 @@ app.post('/ai', async (req, res) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-4-5',
         max_tokens: 400,
         system: system || 'You are Rythm AI, a helpful fitness and nutrition coach.',
         messages,
