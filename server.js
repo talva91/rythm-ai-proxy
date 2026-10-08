@@ -19,7 +19,6 @@ app.post('/fetch', async (req, res) => {
       signal: AbortSignal.timeout(8000),
     });
     const html = await response.text();
-    // Strip HTML tags and collapse whitespace
     const text = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -44,7 +43,7 @@ app.post('/ai', async (req, res) => {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-          'anthropic-workspace-id': 'wrkspc_01MRJj3ftfcKngFvmVwnZNpC',
+        'anthropic-workspace-id': 'wrkspc_01MRJj3ftfcKngFvmVwnZNpC',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
@@ -63,6 +62,44 @@ app.post('/ai', async (req, res) => {
   } catch (err) {
     console.error('Proxy error:', err);
     res.status(500).json({ error: 'Proxy server error' });
+  }
+});
+
+// USDA FoodData Central search — branded + generic foods
+app.post('/usda', async (req, res) => {
+  const { query } = req.body;
+  if (!query) return res.status(400).json({ error: 'query required' });
+  const apiKey = process.env.USDA_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'USDA API key not configured' });
+  try {
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(query)}&dataType=Branded,Foundation,SR%20Legacy&pageSize=10&nutrients=203,204,205,208`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) {
+      console.error('USDA error:', response.status);
+      return res.status(response.status).json({ error: 'USDA API error' });
+    }
+    const data = await response.json();
+    // Normalize results to {name, brand, cal, p, c, f, serving}
+    const foods = (data.foods || []).map(food => {
+      const getNutrient = (id) => {
+        const n = (food.foodNutrients || []).find(n => n.nutrientId === id);
+        return n ? Math.round(n.value) : 0;
+      };
+      return {
+        name: food.description,
+        brand: food.brandOwner || food.brandName || null,
+        cal: getNutrient(208),
+        p: getNutrient(203),
+        f: getNutrient(204),
+        c: getNutrient(205),
+        serving: food.servingSize ? `${food.servingSize}${food.servingSizeUnit||'g'}` : 'per 100g',
+        servingG: food.servingSize || 100,
+      };
+    }).filter(f => f.cal > 0);
+    res.json({ foods });
+  } catch (err) {
+    console.error('USDA proxy error:', err);
+    res.status(500).json({ error: 'Could not reach USDA API' });
   }
 });
 
